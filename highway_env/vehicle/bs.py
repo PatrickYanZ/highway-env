@@ -22,7 +22,7 @@ class RoadObject(ABC):
     LENGTH: float = 2  # Object length [m]
     WIDTH: float = 2  # Object width [m]
 
-    def __init__(self, road: 'Road', position: Sequence[float], heading: float = 0, speed: float = 0):
+    def __init__(self, road: 'Road', position: Sequence[float]):
         """
         :param road: the road instance where the object is placed in
         :param position: cartesian position of object in the surface
@@ -31,10 +31,10 @@ class RoadObject(ABC):
         """
         self.road = road
         self.position = np.array(position, dtype=np.float64)
-        self.heading = heading
-        self.speed = speed
-        self.lane_index = self.road.network.get_closest_lane_index(self.position, self.heading) if self.road else np.nan
-        self.lane = self.road.network.get_lane(self.lane_index) if self.road else None
+
+        self.lane_index = 0
+        # self.lane_index = self.road.network.get_closest_lane_index(self.position, self.heading) if self.road else np.nan
+        # self.lane = self.road.network.get_lane(self.lane_index) if self.road else None
 
         # Enable collision with other collidables
         self.collidable = True
@@ -82,9 +82,9 @@ class RoadObject(ABC):
         intersecting, will_intersect, transition = self._is_colliding(other, dt)
         if will_intersect:
             if self.solid and other.solid:
-                if isinstance(other, Obstacle):
+                if isinstance(other, BS):
                     self.impact = transition
-                elif isinstance(self, Obstacle):
+                elif isinstance(self, BS):
                     other.impact = transition
                 else:
                     self.impact = transition / 2
