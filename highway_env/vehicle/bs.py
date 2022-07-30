@@ -31,8 +31,13 @@ class RoadObject(ABC):
         """
         self.road = road
         self.position = np.array(position, dtype=np.float64)
+<<<<<<< HEAD
 
         self.lane_index = 0
+=======
+        self.heading = heading
+        self.speed = speed
+>>>>>>> 371dc8c9ff4b13b81ca03ef0d37c17143fb201b7
         # self.lane_index = self.road.network.get_closest_lane_index(self.position, self.heading) if self.road else np.nan
         # self.lane = self.road.network.get_lane(self.lane_index) if self.road else None
 
@@ -68,49 +73,51 @@ class RoadObject(ABC):
             speed = lane.speed_limit
         return cls(road, lane.position(longitudinal, 0), lane.heading_at(longitudinal), speed)
 
-    def handle_collisions(self, other: 'RoadObject', dt: float = 0) -> None:
-        """
-        Check for collision with another vehicle.
+    # def handle_collisions(self, other: 'RoadObject', dt: float = 0) -> None:
+    #     """
+    #     Check for collision with another vehicle.
 
-        :param other: the other vehicle or object
-        :param dt: timestep to check for future collisions (at constant velocity)
-        """
-        if other is self or not (self.check_collisions or other.check_collisions):
-            return
-        if not (self.collidable and other.collidable):
-            return
-        intersecting, will_intersect, transition = self._is_colliding(other, dt)
-        if will_intersect:
-            if self.solid and other.solid:
-                if isinstance(other, BS):
-                    self.impact = transition
-                elif isinstance(self, BS):
-                    other.impact = transition
-                else:
-                    self.impact = transition / 2
-                    other.impact = -transition / 2
-        if intersecting:
-            if self.solid and other.solid:
-                self.crashed = True
-                other.crashed = True
-            if not self.solid:
-                self.hit = True
-            if not other.solid:
-                other.hit = True
 
-    def _is_colliding(self, other, dt):
-        # Fast spherical pre-check
-        if np.linalg.norm(other.position - self.position) > self.diagonal + self.speed * dt:
-            return False, False, np.zeros(2,)
-        # Accurate rectangular check
-        return utils.are_polygons_intersecting(self.polygon(), other.polygon(), self.velocity * dt, other.velocity * dt)
+    #     :param other: the other vehicle or object
+    #     :param dt: timestep to check for future collisions (at constant velocity)
+    #     """
+    #     if other is self or not (self.check_collisions or other.check_collisions):
+    #         return
+    #     if not (self.collidable and other.collidable):
+    #         return
+    #     intersecting, will_intersect, transition = self._is_colliding(other, dt)
+    #     if will_intersect:
+    #         if self.solid and other.solid:
+    #             if isinstance(other, Obstacle):
+    #                 self.impact = transition
+    #             elif isinstance(self, Obstacle):
+    #                 other.impact = transition
+    #             else:
+    #                 self.impact = transition / 2
+    #                 other.impact = -transition / 2
+    #     if intersecting:
+    #         if self.solid and other.solid:
+    #             self.crashed = True
+    #             other.crashed = True
+    #         if not self.solid:
+    #             self.hit = True
+    #         if not other.solid:
+    #             other.hit = True
+
+
+    # def _is_colliding(self, other, dt):
+    #     # Fast spherical pre-check
+    #     if np.linalg.norm(other.position - self.position) > self.diagonal + self.speed * dt:
+    #         return False, False, np.zeros(2,)
+    #     # Accurate rectangular check
+    #     return utils.are_polygons_intersecting(self.polygon(), other.polygon(), self.velocity * dt, other.velocity * dt)
 
     # Just added for sake of compatibility
     def to_dict(self, origin_vehicle=None, observe_intentions=True):
         d = {
             'presence': 1,
             'x': self.position[0],
-            'y': self.position[1],
+            'y': 0., #self.position[1],
             'vx': 0.,
             'vy': 0.,
             'cos_h': np.cos(self.heading),
@@ -126,13 +133,13 @@ class RoadObject(ABC):
                 d[key] -= origin_dict[key]
         return d
 
-    @property
-    def direction(self) -> np.ndarray:
-        return np.array([np.cos(self.heading), np.sin(self.heading)])
+    # @property
+    # def direction(self) -> np.ndarray:
+    #     return np.array([np.cos(self.heading), np.sin(self.heading)])
 
-    @property
-    def velocity(self) -> np.ndarray:
-        return self.speed * self.direction
+    # @property
+    # def velocity(self) -> np.ndarray:
+    #     return self.speed * self.direction
 
     def polygon(self) -> np.ndarray:
         points = np.array([
@@ -149,19 +156,19 @@ class RoadObject(ABC):
         points = (rotation @ points).T + np.tile(self.position, (4, 1))
         return np.vstack([points, points[0:1]])
 
-    def lane_distance_to(self, other: 'RoadObject', lane: 'AbstractLane' = None) -> float:
-        """
-        Compute the signed distance to another object along a lane.
+    # def lane_distance_to(self, other: 'RoadObject', lane: 'AbstractLane' = None) -> float:
+    #     """
+    #     Compute the signed distance to another object along a lane.
 
-        :param other: the other object
-        :param lane: a lane
-        :return: the distance to the other other [m]
-        """
-        if not other:
-            return np.nan
-        if not lane:
-            lane = self.lane
-        return lane.local_coordinates(other.position)[0] - lane.local_coordinates(self.position)[0]
+    #     :param other: the other object
+    #     :param lane: a lane
+    #     :return: the distance to the other other [m]
+    #     """
+    #     if not other:
+    #         return np.nan
+    #     if not lane:
+    #         lane = self.lane
+    #     return lane.local_coordinates(other.position)[0] - lane.local_coordinates(self.position)[0]
 
     @property
     def on_road(self) -> bool:
