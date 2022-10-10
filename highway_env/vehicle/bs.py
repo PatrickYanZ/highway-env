@@ -185,27 +185,27 @@ class RoadObject(ABC):
         return self.__str__()
 
 
-# class Obstacle(RoadObject):
+    class Obstacle(RoadObject):
 
-#     """Obstacles on the road."""
+        """Obstacles on the road."""
 
-#     def __init__(self, road, position: Sequence[float], heading: float = 0, speed: float = 0):
-#         super().__init__(road, position, heading, speed)
-#         self.solid = True
+        def __init__(self, road, position: Sequence[float], heading: float = 0, speed: float = 0):
+            super().__init__(road, position, heading, speed)
+            self.solid = True
 
 
-# class Landmark(RoadObject):
+    class Landmark(RoadObject):
 
-#     """Landmarks of certain areas on the road that must be reached."""
+        """Landmarks of certain areas on the road that must be reached."""
 
-#     def __init__(self, road, position: Sequence[float], heading: float = 0, speed: float = 0):
-#         super().__init__(road, position, heading, speed)
-#         self.solid = False
+        def __init__(self, road, position: Sequence[float], heading: float = 0, speed: float = 0):
+            super().__init__(road, position, heading, speed)
+            self.solid = False
 
-class BS(RoadObject):
+    class BS(RoadObject):
 
-    """BSs on the road."""
+        """BSs on the road."""
 
-    def __init__(self, road: float = 0, position: Sequence[float], heading: float = 0, speed: float = 0):
-        super().__init__(road, position, heading, speed)
-        self.solid = True
+        def __init__(self, road, position: Sequence[float], heading: float = 0, speed: float = 0):
+            super().__init__(road, position, heading, speed)
+            self.solid = True
