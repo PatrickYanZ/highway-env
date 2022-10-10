@@ -10,6 +10,9 @@ from highway_env.vehicle.controller import ControlledVehicle
 from highway_env.vehicle.kinematics import Vehicle
 from highway_env.vehicle.objects import Obstacle
 
+from typing import Dict, Text
+
+
 class HighwayEnv(AbstractEnv):
     """
     A highway driving environment.
@@ -77,73 +80,13 @@ class HighwayEnv(AbstractEnv):
                 vehicle.randomize_behavior()
                 self.road.vehicles.append(vehicle)
 
-    def _reward(self, action: Action) -> float:
-        """
-        The reward is defined to foster driving at high speed, on the rightmost lanes, and to avoid collisions.
-        :param action: the last action performed
-        :return: the corresponding reward
-        """
-        neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
-        lane = self.vehicle.target_lane_index[2] if isinstance(self.vehicle, ControlledVehicle) \
-            else self.vehicle.lane_index[2]
-        # Use forward speed rather than speed, see https://github.com/eleurent/highway-env/issues/268
-        forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
-        scaled_speed = utils.lmap(forward_speed, self.config["reward_speed_range"], [0, 1])
-        reward = \
-            + self.config["collision_reward"] * self.vehicle.crashed \
-            + self.config["right_lane_reward"] * lane / max(len(neighbours) - 1, 1) \
-            + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
-        reward = utils.lmap(reward,
-                          [self.config["collision_reward"],
-                           self.config["high_speed_reward"] + self.config["right_lane_reward"]],
-                          [0, 1])
-        reward = 0 if not self.vehicle.on_road else reward
-        return reward
-
-    def _is_terminal(self) -> bool:
-        """The episode is over if the ego vehicle crashed or the time is out."""
-        return self.vehicle.crashed or \
-            self.time >= self.config["duration"] or \
-            (self.config["offroad_terminal"] and not self.vehicle.on_road)
-
-    def _cost(self, action: int) -> float:
-        """The cost signal is the occurrence of collision."""
-        return float(self.vehicle.crashed)
-
-
-class HighwayEnvFast(HighwayEnv):
-    """
-    A variant of highway-v0 with faster execution:
-        - lower simulation frequency
-        - fewer vehicles in the scene (and fewer lanes, shorter episode duration)
-        - only check collision of controlled vehicles with others
-    """
-    @classmethod
-    def default_config(cls) -> dict:
-        cfg = super().default_config()
-        cfg.update({
-            "simulation_frequency": 5,
-            "lanes_count": 3,
-            "vehicles_count": 20,
-            "duration": 30,  # [s]
-            "ego_spacing": 1.5,
-        })
-        return cfg
-
-    def _create_vehicles(self) -> None:
-        super()._create_vehicles()
-        # Disable collision check for uncontrolled vehicles
-        for vehicle in self.road.vehicles:
-            if vehicle not in self.controlled_vehicles:
-                vehicle.check_collisions = False
-
-class HighwayEnvObstacle(HighwayEnv):
+    class HighwayEnvObstacle(HighwayEnv):
 
     @classmethod
     def default_config(cls) -> dict:
         conf = super().default_config()
         conf.update({
-            "obstacle_count": 200,
+            "obstacle_count": 10,
             # https://github.com/eleurent/highway-env/issues/35#issuecomment-1206427869
             "termination_agg_fn": 'any'
         })
@@ -155,8 +98,8 @@ class HighwayEnvObstacle(HighwayEnv):
         other_per_controlled = near_split(self.config["vehicles_count"], num_bins=self.config["controlled_vehicles"])
 
         self.controlled_vehicles = []
-        # vehicle_dist = 0.0
-        # lanes = [4 * lane for lane in range(self.config["lanes_count"])]
+        vehicle_dist = 0.0
+        lanes = [4 * lane for lane in range(self.config["lanes_count"])]
         for others in other_per_controlled:
             vehicle = Vehicle.create_random(
                 self.road,
@@ -166,10 +109,11 @@ class HighwayEnvObstacle(HighwayEnv):
             )
             vehicle = self.action_type.vehicle_class(self.road, vehicle.position, vehicle.heading, vehicle.speed)
             if self.config['controlled_vehicles']:
-                # vehicle_lane = np.random.choice(lanes)
-                # To make sure the agents doesn't collide on the start itself because of the random obstacles.
-                # vehicle.position = np.array([vehicle_dist, vehicle_lane])
-                # vehicle_dist += 25
+                vehicle_lane = np.random.choice(lanes)
+                """To approximate the distance travelled by the agents and to make sure the agents doesn't collide on 
+                the start itself because of the random obstacles."""
+                vehicle.position = np.array([vehicle_dist, vehicle_lane])
+                vehicle_dist += 25
                 self.controlled_vehicles.append(vehicle)
                 self.road.vehicles.append(vehicle)
             else:
@@ -184,11 +128,12 @@ class HighwayEnvObstacle(HighwayEnv):
         self.road = Road(network=RoadNetwork.straight_road_network(self.config["lanes_count"]+1, speed_limit=30),
                          np_random=self.np_random, record_history=self.config["show_trajectories"])
         # Adding obstacles at random places on the lanes
-        for i in range(1, self.config['obstacle_count']):
+        np.random.seed(2)
+        for i in range(self.config['obstacle_count']):
             # lanes = [4 * lane for lane in range(self.config["lanes_count"])]
-            # obstacle_lane = np.random.choice(lanes) 
-            obstacle_lane = [0]
-            obstacle_dist = np.random.randint(300, 10000)
+            # obstacle_lane = np.random.choice(lanes)
+            obstacle_lane = [self.config["lanes_count"]+1]
+            obstacle_dist = np.random.randint(200, 600)
             self.road.objects.append(Obstacle(self.road, [obstacle_dist, obstacle_lane]))
 
     def _info(self, obs: np.ndarray, action: int) -> dict:
@@ -208,13 +153,12 @@ class HighwayEnvObstacle(HighwayEnv):
         return vehicle.crashed or \
             (self.config["offroad_terminal"] and not vehicle.on_road)
 
-    # To terminate when the duration limit has reached.
     def _is_truncated(self) -> bool:
-        """The episode is over if the ego vehicle crashed or the time is out."""
+        """To terminate when the duration limit has reached."""
         return self.time >= self.config["duration"]
 
-    # To terminate training based on any or all agent has collided.
     def _is_terminated(self) -> bool:
+        """To terminate training based on any or all agent has collided."""
         # https://github.com/eleurent/highway-env/issues/35#issuecomment-1206427869
         agent_terminal = [self._agent_is_terminal(vehicle) for vehicle in self.controlled_vehicles]
         agg_fn = {'any': any, 'all': all}[self.config['termination_agg_fn']]
@@ -222,8 +166,7 @@ class HighwayEnvObstacle(HighwayEnv):
 
     def _reward(self, action: int) -> float:
         """Aggregated reward, for cooperative agents"""
-        return sum(self._agent_reward(action, vehicle) for vehicle in self.controlled_vehicles) \
-               / len(self.controlled_vehicles)
+        return sum(self._agent_reward(action, vehicle) for vehicle in self.controlled_vehicles) / len(self.controlled_vehicles)
 
     def _rewards(self, action: int) -> Dict[Text, float]:
         """Multi-objective rewards, for cooperative agents."""
@@ -232,7 +175,6 @@ class HighwayEnvObstacle(HighwayEnv):
             name: sum(agent_rewards[name] for agent_rewards in agents_rewards) / len(agents_rewards)
             for name in agents_rewards[0].keys()
         }
-
 
     def _agent_reward(self, action: int, vehicle: Vehicle) -> float:
         """Per-agent reward signal."""
@@ -260,6 +202,7 @@ class HighwayEnvObstacle(HighwayEnv):
             "high_speed_reward": np.clip(scaled_speed, 0, 1),
             "on_road_reward": float(vehicle.on_road)
         }
+
 
 
 
