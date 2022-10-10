@@ -164,9 +164,6 @@ class HighwayEnvObstacle(HighwayEnv):
         })
         return conf
 
-
-
-
     def _create_vehicles(self) -> None:
         """Create some new random vehicles of a given type, and add them on the road."""
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
